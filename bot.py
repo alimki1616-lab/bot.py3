@@ -3,7 +3,6 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import DiceEmoji
-from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from pathlib import Path
@@ -24,10 +23,10 @@ INITIAL_BALANCE = 10
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN تنظیم نشده! لطفاً در .env یا Railway تنظیم کنید.")
 
-# اتصال به MongoDB
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(mongo_url)
-db = client['telegram_betting_bot']
+# ذخیره داده‌ها در حافظه
+users_db = {}
+games_db = []
+withdrawals_db = []
 
 # تنظیم لاگ
 logging.basicConfig(
@@ -66,11 +65,11 @@ WINNING_CONDITIONS = {
 }
 
 # توابع کمکی
-async def get_user(user_id: int):
-    """دریافت کاربر از دیتابیس"""
-    return await db.users.find_one({"user_id": user_id})
+def get_user(user_id: int):
+    """دریافت کاربر از حافظه"""
+    return users_db.get(user_id)
 
-async def create_user(user_id: int, username: str = None, referred_by: int = None):
+def create_user(user_id: int, username: str = None, referred_by: int = None):
     """ایجاد کاربر جدید"""
     user_data = {
         "user_id": user_id,
@@ -85,28 +84,19 @@ async def create_user(user_id: int, username: str = None, referred_by: int = Non
         "created_at": datetime.now(timezone.utc).isoformat(),
         "last_activity": datetime.now(timezone.utc).isoformat()
     }
-    await db.users.insert_one(user_data)
+    users_db[user_id] = user_data
     
     # پاداش رفرال
-    if referred_by:
-        referrer = await get_user(referred_by)
-        if referrer:
-            await db.users.update_one(
-                {"user_id": referred_by},
-                {
-                    "$inc": {"balance": REFERRAL_REWARD},
-                    "$push": {"referrals": user_id}
-                }
-            )
+    if referred_by and referred_by in users_db:
+        users_db[referred_by]["balance"] += REFERRAL_REWARD
+        users_db[referred_by]["referrals"].append(user_id)
     
-    return await get_user(user_id)
+    return users_db[user_id]
 
-async def update_balance(user_id: int, amount: int):
+def update_balance(user_id: int, amount: int):
     """بروزرسانی موجودی کاربر"""
-    await db.users.update_one(
-        {"user_id": user_id},
-        {"$inc": {"balance": amount}}
-    )
+    if user_id in users_db:
+        users_db[user_id]["balance"] += amount
 
 async def check_channel_membership(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """بررسی عضویت کاربر در کانال"""
@@ -192,10 +182,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # بررسی کاربر در دیتابیس
-    user_data = await get_user(user_id)
+    # بررسی کاربر در حافظه
+    user_data = get_user(user_id)
     if not user_data:
-        user_data = await create_user(user_id, username, referred_by)
+        user_data = create_user(user_id, username, referred_by)
         
         # اطلاع به رفرر
         if referred_by:
@@ -235,7 +225,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     # بررسی بلاک بودن کاربر
-    user_data = await get_user(user_id)
+    user_data = get_user(user_id)
     if user_data and user_data.get('is_blocked', False) and user_id != ADMIN_ID:
         await query.edit_message_text("🚫 شما از استفاده از ربات مسدود شده‌اید.")
         return
@@ -244,9 +234,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "check_membership":
         is_member = await check_channel_membership(user_id, context)
         if is_member:
-            user_data = await get_user(user_id)
+            user_data = get_user(user_id)
             if not user_data:
-                await create_user(user_id, query.from_user.username)
+                create_user(user_id, query.from_user.username)
             await query.edit_message_text(
                 "✅ عضویت شما تأیید شد!\n\nاز دستور /start استفاده کنید."
             )
@@ -290,21 +280,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if win:
             reward = bet_amount * 2
-            await update_balance(user_id, reward)
+            update_balance(user_id, reward)
             result_emoji = "🎉"
             result_text = f"برنده شدید!\n💰 {reward} Dogs به موجودی شما اضافه شد"
-            await db.users.update_one(
-                {"user_id": user_id},
-                {"$inc": {"total_wins": 1, "games_played": 1}}
-            )
+            users_db[user_id]["total_wins"] += 1
+            users_db[user_id]["games_played"] += 1
         else:
-            await update_balance(user_id, -bet_amount)
+            update_balance(user_id, -bet_amount)
             result_emoji = "😔"
             result_text = f"باختید!\n💸 {bet_amount} Dogs از موجودی شما کم شد"
-            await db.users.update_one(
-                {"user_id": user_id},
-                {"$inc": {"total_losses": 1, "games_played": 1}}
-            )
+            users_db[user_id]["total_losses"] += 1
+            users_db[user_id]["games_played"] += 1
         
         # ذخیره نتیجه بازی
         game_record = {
@@ -316,10 +302,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "won": win,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        await db.games.insert_one(game_record)
+        games_db.append(game_record)
         
         # دریافت موجودی جدید
-        updated_user = await get_user(user_id)
+        updated_user = get_user(user_id)
         
         await context.bot.send_message(
             chat_id=query.message.chat_id,
@@ -477,9 +463,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # آمار کاربران (ادمین)
     if data == "admin_users" and user_id == ADMIN_ID:
-        total_users = await db.users.count_documents({})
-        blocked_users = await db.users.count_documents({"is_blocked": True})
-        total_games = await db.games.count_documents({})
+        total_users = len(users_db)
+        blocked_users = sum(1 for u in users_db.values() if u.get('is_blocked', False))
+        total_games = len(games_db)
         
         admin_text = f"""👥 آمار کاربران:
 
@@ -494,13 +480,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # نتایج بازی‌ها (ادمین)
     if data == "admin_games" and user_id == ADMIN_ID:
-        recent_games = await db.games.find().sort("timestamp", -1).limit(10).to_list(10)
+        recent_games = games_db[-10:] if len(games_db) > 10 else games_db
         
         games_text = "🎮 آخرین نتایج بازی‌ها:\n\n"
-        for game in recent_games:
+        for game in reversed(recent_games):
             result = "✅ برد" if game['won'] else "❌ باخت"
             username = game.get('username', 'unknown')
             games_text += f"👤 @{username}\n🎯 {game['game_type']} - {game['bet_amount']} Dogs - {result}\n\n"
+        
+        if not recent_games:
+            games_text = "هیچ بازی‌ای ثبت نشده است."
         
         await query.edit_message_text(games_text, reply_markup=get_admin_keyboard())
         return
@@ -543,9 +532,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # درخواست‌های برداشت (ادمین)
     if data == "admin_withdrawals" and user_id == ADMIN_ID:
-        withdrawals = await db.withdrawals.find({"status": "pending"}).to_list(50)
+        pending_withdrawals = [w for w in withdrawals_db if w.get('status') == 'pending']
         
-        if not withdrawals:
+        if not pending_withdrawals:
             await query.edit_message_text(
                 "📋 هیچ درخواست برداشتی وجود ندارد.",
                 reply_markup=get_admin_keyboard()
@@ -553,7 +542,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         withdrawal_text = "📋 درخواست‌های برداشت:\n\n"
-        for w in withdrawals:
+        for w in pending_withdrawals:
             withdrawal_text += f"👤 {w['username']} (ID: {w['user_id']})\n💰 مبلغ: {w['amount']} Dogs\n\n"
         
         await query.edit_message_text(withdrawal_text, reply_markup=get_admin_keyboard())
@@ -574,7 +563,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # بررسی درخواست برداشت
     if context.user_data.get('waiting_for_withdrawal'):
-        user_data = await get_user(user_id)
+        user_data = get_user(user_id)
         
         # ذخیره درخواست برداشت
         withdrawal_data = {
@@ -585,7 +574,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "status": "pending",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        await db.withdrawals.insert_one(withdrawal_data)
+        withdrawals_db.append(withdrawal_data)
         
         # اطلاع به ادمین
         try:
@@ -613,7 +602,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 target_user_id = int(parts[0])
                 amount = int(parts[1])
                 
-                await update_balance(target_user_id, amount)
+                update_balance(target_user_id, amount)
                 await update.message.reply_text(
                     f"✅ {amount} Dogs به حساب کاربر {target_user_id} اضافه شد.",
                     reply_markup=get_admin_keyboard()
@@ -629,7 +618,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 target_user_id = int(parts[0])
                 amount = int(parts[1])
                 
-                await update_balance(target_user_id, -amount)
+                update_balance(target_user_id, -amount)
                 await update.message.reply_text(
                     f"✅ {amount} Dogs از حساب کاربر {target_user_id} کم شد.",
                     reply_markup=get_admin_keyboard()
@@ -642,14 +631,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif admin_action == 'block_user':
             try:
                 target_user_id = int(text.strip())
-                await db.users.update_one(
-                    {"user_id": target_user_id},
-                    {"$set": {"is_blocked": True}}
-                )
-                await update.message.reply_text(
-                    f"✅ کاربر {target_user_id} مسدود شد.",
-                    reply_markup=get_admin_keyboard()
-                )
+                if target_user_id in users_db:
+                    users_db[target_user_id]['is_blocked'] = True
+                    await update.message.reply_text(
+                        f"✅ کاربر {target_user_id} مسدود شد.",
+                        reply_markup=get_admin_keyboard()
+                    )
+                else:
+                    await update.message.reply_text("❌ کاربر پیدا نشد!")
                 context.user_data['admin_action'] = None
             except:
                 await update.message.reply_text("❌ فرمت نادرست! مثال: 123456789")
@@ -658,14 +647,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif admin_action == 'unblock_user':
             try:
                 target_user_id = int(text.strip())
-                await db.users.update_one(
-                    {"user_id": target_user_id},
-                    {"$set": {"is_blocked": False}}
-                )
-                await update.message.reply_text(
-                    f"✅ کاربر {target_user_id} آزاد شد.",
-                    reply_markup=get_admin_keyboard()
-                )
+                if target_user_id in users_db:
+                    users_db[target_user_id]['is_blocked'] = False
+                    await update.message.reply_text(
+                        f"✅ کاربر {target_user_id} آزاد شد.",
+                        reply_markup=get_admin_keyboard()
+                    )
+                else:
+                    await update.message.reply_text("❌ کاربر پیدا نشد!")
                 context.user_data['admin_action'] = None
             except:
                 await update.message.reply_text("❌ فرمت نادرست! مثال: 123456789")
