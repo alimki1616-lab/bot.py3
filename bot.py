@@ -12,13 +12,17 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # تنظیمات
-BOT_TOKEN = "8060284213:AAFhagBrYEgmsRAMA2Jfry4N4JzMrTe0Wa0"
-ADMIN_ID = 872863489
-CHANNEL_USERNAME = "@GiftsChatt"
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
+CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@GiftsChatt')
 MIN_WITHDRAWAL = 100
 MIN_GAMES_FOR_WITHDRAWAL = 5
 REFERRAL_REWARD = 5
 INITIAL_BALANCE = 10
+
+# بررسی وجود توکن
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN تنظیم نشده! لطفاً در .env یا Railway تنظیم کنید.")
 
 # اتصال به MongoDB
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
