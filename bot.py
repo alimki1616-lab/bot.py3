@@ -14,12 +14,13 @@ load_dotenv(ROOT_DIR / '.env')
 # تنظیمات
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
-CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@GiftsChatt')
-MIN_WITHDRAWAL = 100
+CHANNEL_USERNAME = '@DepositStarsBet'
+DEPOSIT_POST_LINK = 'https://t.me/DepositStarsBet/2'
+MIN_WITHDRAWAL = 15
 MIN_GAMES_FOR_WITHDRAWAL = 5
-REFERRAL_REWARD = 5
-INITIAL_BALANCE = 10
-MIN_BET = 5
+REFERRAL_REWARD = 1
+INITIAL_BALANCE = 2
+MIN_BET = 1
 
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN تنظیم نشده! لطفاً در .env یا Railway تنظیم کنید.")
@@ -29,8 +30,8 @@ games_db = []
 withdrawals_db = []
 
 # آمار کل سیستم
-total_dogs_earned = 0  # کل Dogs کسب شده توسط کاربران
-total_dogs_lost = 0    # کل Dogs از دست رفته توسط کاربران
+total_stars_earned = 0  # کل Stars کسب شده توسط کاربران
+total_stars_lost = 0    # کل Stars از دست رفته توسط کاربران
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -74,6 +75,13 @@ GAME_GUIDE = {
     "dice": "🎲 برای برد باید عدد 6 بیاید"
 }
 
+# گزینه‌های برداشت
+WITHDRAWAL_OPTIONS = {
+    "teddy": {"name": "🧸 تدی", "amount": 15},
+    "flower": {"name": "🌹 گل", "amount": 25},
+    "rocket": {"name": "🚀 موشک", "amount": 50}
+}
+
 def get_user(user_id: int):
     return users_db.get(user_id)
 
@@ -93,6 +101,7 @@ def create_user(user_id: int, username: str = None, referred_by: int = None):
     }
     users_db[user_id] = user_data
     
+    # فقط به کسی که دعوت کرده پاداش بده
     if referred_by and referred_by in users_db:
         users_db[referred_by]["balance"] += REFERRAL_REWARD
         users_db[referred_by]["referrals"].append(user_id)
@@ -100,7 +109,7 @@ def create_user(user_id: int, username: str = None, referred_by: int = None):
     return users_db[user_id]
 
 async def update_balance(user_id: int, amount: int, context: ContextTypes.DEFAULT_TYPE, reason: str = None):
-    global total_dogs_earned, total_dogs_lost
+    global total_stars_earned, total_stars_lost
     
     if user_id in users_db:
         old_balance = users_db[user_id]["balance"]
@@ -109,20 +118,20 @@ async def update_balance(user_id: int, amount: int, context: ContextTypes.DEFAUL
         
         # به‌روزرسانی آمار کل سیستم
         if amount > 0:
-            total_dogs_earned += amount
+            total_stars_earned += amount
         else:
-            total_dogs_lost += abs(amount)
+            total_stars_lost += abs(amount)
         
         if amount > 0:
             notification_text = "╔═══════════════════╗\n"
             notification_text += "║  💎 افزایش موجودی  ║\n"
             notification_text += "╚═══════════════════╝\n\n"
             notification_text += f"📊 موجودی قبلی:\n"
-            notification_text += f"   └─ {old_balance} 🦮\n\n"
+            notification_text += f"   └─ {old_balance} ⭐\n\n"
             notification_text += f"✨ مبلغ دریافتی:\n"
-            notification_text += f"   └─ +{amount} 🦮\n\n"
+            notification_text += f"   └─ +{amount} ⭐\n\n"
             notification_text += f"💰 موجودی جدید:\n"
-            notification_text += f"   └─ {new_balance} 🦮\n\n"
+            notification_text += f"   └─ {new_balance} ⭐\n\n"
             if reason:
                 notification_text += f"━━━━━━━━━━━━━━━━━━\n"
                 notification_text += f"💬 {reason}"
@@ -168,8 +177,8 @@ def get_admin_keyboard():
     keyboard = [
         [InlineKeyboardButton("👥 آمار کاربران", callback_data="admin_users"),
          InlineKeyboardButton("🎮 بازی‌ها", callback_data="admin_games")],
-        [InlineKeyboardButton("💰 آمار Dogs", callback_data="admin_dogs_stats")],
-        [InlineKeyboardButton("🔄 بازیابی آمار Dogs", callback_data="admin_reset_dogs_stats")],
+        [InlineKeyboardButton("⭐ آمار Stars", callback_data="admin_stars_stats")],
+        [InlineKeyboardButton("🔄 بازیابی آمار Stars", callback_data="admin_reset_stars_stats")],
         [InlineKeyboardButton("➕ افزایش موجودی", callback_data="admin_add_balance"),
          InlineKeyboardButton("➖ کاهش موجودی", callback_data="admin_reduce_balance")],
         [InlineKeyboardButton("🚫 بلاک", callback_data="admin_block"),
@@ -183,11 +192,19 @@ def get_admin_keyboard():
 
 def get_bet_amount_keyboard():
     keyboard = [
-        [InlineKeyboardButton("5 🦮", callback_data="bet_5"),
-         InlineKeyboardButton("10 🦮", callback_data="bet_10"),
-         InlineKeyboardButton("20 🦮", callback_data="bet_20")],
-        [InlineKeyboardButton("50 🦮", callback_data="bet_50"),
-         InlineKeyboardButton("💰 مبلغ دلخواه", callback_data="bet_custom")],
+        [InlineKeyboardButton("1 ⭐", callback_data="bet_1"),
+         InlineKeyboardButton("5 ⭐", callback_data="bet_5"),
+         InlineKeyboardButton("10 ⭐", callback_data="bet_10")],
+        [InlineKeyboardButton("💰 مبلغ دلخواه", callback_data="bet_custom")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_withdrawal_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🧸 تدی - 15 ⭐", callback_data="withdraw_teddy")],
+        [InlineKeyboardButton("🌹 گل - 25 ⭐", callback_data="withdraw_flower")],
+        [InlineKeyboardButton("🚀 موشک - 50 ⭐", callback_data="withdraw_rocket")],
         [InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -233,33 +250,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_data:
         user_data = create_user(user_id, username, referred_by)
         
+        # اعلان به کسی که دعوت کرده
         if referred_by:
             try:
+                referrer_username = f"@{username}" if username else f"User {user_id}"
                 await context.bot.send_message(
                     chat_id=referred_by,
-                    text=f"🎉 تبریک! کاربر جدیدی با لینک شما عضو شد\n\n💰 {REFERRAL_REWARD} 🦮 به موجودی شما اضافه شد"
+                    text=f"🎉 تبریک! کاربر جدیدی با لینک شما عضو شد\n\n"
+                         f"👤 کاربر: {referrer_username}\n"
+                         f"💰 {REFERRAL_REWARD} ⭐ به موجودی شما اضافه شد"
                 )
             except:
                 pass
     
-    welcome_text = "╔═══════════════════╗\n"
-    welcome_text += "║   🎮 خوش آمدید!   ║\n"
-    welcome_text += "╚═══════════════════╝\n\n"
-    welcome_text += f"👤 {user.first_name}\n"
-    welcome_text += f"💰 موجودی: {user_data['balance']} 🦮\n\n"
-    welcome_text += "━━━━━━━━━━━━━━━━━━\n"
-    welcome_text += "🎯 بازی‌های موجود:\n"
-    welcome_text += "━━━━━━━━━━━━━━━━━━\n\n"
-    welcome_text += "⚽ فوتبال  │  🏀 بسکتبال\n"
-    welcome_text += "🎯 دارت    │  🎳 بولینگ\n"
-    welcome_text += "🎰 اسلات   │  🎲 تاس\n\n"
-    welcome_text += "━━━━━━━━━━━━━━━━━━\n"
-    welcome_text += "🎲 یک بازی انتخاب کنید!"
+    welcome_text = "✨━━━━━━━━━━━━━━━━━━✨\n"
+    welcome_text += "🎮  به دنیای هیجان خوش آمدید  🎮\n"
+    welcome_text += "✨━━━━━━━━━━━━━━━━━━✨\n\n"
+    welcome_text += f"👋 سلام {user.first_name} عزیز!\n"
+    welcome_text += f"💎 کیف پول شما: {user_data['balance']} ⭐\n\n"
+    welcome_text += "🎯 ━━━ بازی‌های هیجان‌انگیز ━━━ 🎯\n\n"
+    welcome_text += "⚽ فوتبال | شوت به دروازه!\n"
+    welcome_text += "🏀 بسکتبال | پرتاب طلایی!\n"
+    welcome_text += "🎯 دارت | نشانه‌گیری دقیق!\n"
+    welcome_text += "🎳 بولینگ | استرایک کامل!\n"
+    welcome_text += "🎰 اسلات | شانس بزرگ!\n"
+    welcome_text += "🎲 تاس | حدس شماره!\n\n"
+    welcome_text += "🔥 آماده‌اید برای برد بزرگ؟ 🔥\n"
+    welcome_text += "👇 یک بازی انتخاب کنید 👇"
     
     await update.message.reply_text(welcome_text, reply_markup=get_main_keyboard(user_id == ADMIN_ID))
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global total_dogs_earned, total_dogs_lost
+    global total_stars_earned, total_stars_lost
     
     query = update.callback_query
     await query.answer()
@@ -291,15 +313,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         game_guide = GAME_GUIDE.get(game_type, "")
         
-        game_text = "╔═══════════════════╗\n"
-        game_text += f"║  {GAME_NAMES[game_type]}  ║\n"
-        game_text += "╚═══════════════════╝\n\n"
-        game_text += f"{game_guide}\n\n"
+        game_text = f"🎮 ━━━ {GAME_NAMES[game_type]} ━━━ 🎮\n\n"
+        game_text += f"✨ {game_guide} ✨\n\n"
         game_text += "━━━━━━━━━━━━━━━━━━\n"
-        game_text += "💰 انتخاب مبلغ شرط:\n"
+        game_text += "💰 چقدر می‌خوای شرط ببندی؟\n"
         game_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        game_text += f"حداقل: {MIN_BET} 🦮\n"
-        game_text += f"موجودی: {user_data['balance']} 🦮"
+        game_text += f"📊 کیف پول: {user_data['balance']} ⭐\n"
+        game_text += f"🎯 حداقل شرط: {MIN_BET} ⭐\n\n"
+        game_text += "🔥 برد = ضربدر 2 شرط شما! 🔥"
         
         await query.edit_message_text(
             game_text,
@@ -315,8 +336,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             custom_text = "╔═══════════════════╗\n"
             custom_text += "║  💰 مبلغ دلخواه   ║\n"
             custom_text += "╚═══════════════════╝\n\n"
-            custom_text += f"📊 موجودی شما: {user_data['balance']} 🦮\n"
-            custom_text += f"⚠️ حداقل شرط: {MIN_BET} 🦮\n\n"
+            custom_text += f"📊 موجودی شما: {user_data['balance']} ⭐\n"
+            custom_text += f"⚠️ حداقل شرط: {MIN_BET} ⭐\n\n"
             custom_text += "━━━━━━━━━━━━━━━━━━\n"
             custom_text += "💬 مبلغ را وارد کنید:"
             
@@ -335,13 +356,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game_type = context.user_data.get('current_game', 'football')
         
         # نمایش لودینگ
-        loading_text = "╔═══════════════════╗\n"
-        loading_text += f"║  {GAME_NAMES[game_type]}  ║\n"
-        loading_text += "╚═══════════════════╝\n\n"
-        loading_text += "⏳ در حال انجام بازی...\n\n"
+        loading_text = "⏳ ━━━━━━━━━━━━━━━━━━ ⏳\n"
+        loading_text += f"   {GAME_NAMES[game_type]}   \n"
+        loading_text += "⏳ ━━━━━━━━━━━━━━━━━━ ⏳\n\n"
+        loading_text += "🎲 بازی در حال انجامه...\n\n"
         loading_text += "━━━━━━━━━━━━━━━━━━\n"
-        loading_text += f"💰 شرط: {bet_amount} 🦮\n"
-        loading_text += "━━━━━━━━━━━━━━━━━━"
+        loading_text += f"💰 شرط شما: {bet_amount} ⭐\n"
+        loading_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        loading_text += "🤞 خدا خدا کن برنده شی! 🤞"
         
         await query.edit_message_text(loading_text)
         
@@ -362,15 +384,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reward = bet_amount * 2
             await update_balance(user_id, reward, context, f"برد در {GAME_NAMES[game_type]}")
             
-            result_text = "╔═══════════════════╗\n"
-            result_text += "║   🎉 برنده شدید!   ║\n"
-            result_text += "╚═══════════════════╝\n\n"
-            result_text += "━━━━━━━━━━━━━━━━━━\n"
+            result_text = "🎉 ━━━━━━━━━━━━━━━━━━ 🎉\n"
+            result_text += "      🏆 برنده شدی! 🏆      \n"
+            result_text += "🎉 ━━━━━━━━━━━━━━━━━━ 🎉\n\n"
             result_text += f"🎮 بازی: {GAME_NAMES[game_type]}\n"
-            result_text += f"🎯 نتیجه: {dice_value}\n"
+            result_text += f"🎯 نتیجه: {dice_value}\n\n"
             result_text += "━━━━━━━━━━━━━━━━━━\n\n"
-            result_text += f"💰 شرط شما: {bet_amount} 🦮\n"
-            result_text += f"🎁 برد شما: {reward} 🦮\n\n"
+            result_text += f"💰 شرط شما: {bet_amount} ⭐\n"
+            result_text += f"🎁 جایزه: {reward} ⭐\n\n"
             result_text += "━━━━━━━━━━━━━━━━━━\n"
             
             users_db[user_id]["total_wins"] += 1
@@ -378,14 +399,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update_balance(user_id, -bet_amount, context)
             
-            result_text = "╔═══════════════════╗\n"
-            result_text += "║    😔 باختید!     ║\n"
-            result_text += "╚═══════════════════╝\n\n"
-            result_text += "━━━━━━━━━━━━━━━━━━\n"
+            result_text = "😔 ━━━━━━━━━━━━━━━━━━ 😔\n"
+            result_text += "      این دفعه نشد!      \n"
+            result_text += "😔 ━━━━━━━━━━━━━━━━━━ 😔\n\n"
             result_text += f"🎮 بازی: {GAME_NAMES[game_type]}\n"
-            result_text += f"🎯 نتیجه: {dice_value}\n"
+            result_text += f"🎯 نتیجه: {dice_value}\n\n"
             result_text += "━━━━━━━━━━━━━━━━━━\n\n"
-            result_text += f"💸 باخت: {bet_amount} 🦮\n\n"
+            result_text += f"💸 از دست رفت: {bet_amount} ⭐\n\n"
+            result_text += "💪 نا امید نشو!\n"
+            result_text += "دفعه بعد می‌بری! 🔥\n\n"
             result_text += "━━━━━━━━━━━━━━━━━━\n"
             
             users_db[user_id]["total_losses"] += 1
@@ -404,7 +426,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         updated_user = get_user(user_id)
         result_text += f"💰 موجودی جدید:\n"
-        result_text += f"   └─ {updated_user['balance']} 🦮"
+        result_text += f"   └─ {updated_user['balance']} ⭐"
         
         # ویرایش پیام اصلی
         await query.edit_message_text(
@@ -414,17 +436,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "balance":
-        balance_text = "╔═══════════════════╗\n"
-        balance_text += "║   💰 موجودی من    ║\n"
-        balance_text += "╚═══════════════════╝\n\n"
+        balance_text = "💎 ━━━━━━━━━━━━━━━━━━ 💎\n"
+        balance_text += "       کیف پول شما       \n"
+        balance_text += "💎 ━━━━━━━━━━━━━━━━━━ 💎\n\n"
+        balance_text += f"✨ موجودی فعلی شما:\n\n"
+        balance_text += f"      🌟 {user_data['balance']} ⭐ 🌟\n\n"
         balance_text += "━━━━━━━━━━━━━━━━━━\n"
-        balance_text += f"💎 موجودی فعلی:\n"
-        balance_text += f"   └─ {user_data['balance']} 🦮\n"
+        balance_text += "🚀 راه‌های افزایش موجودی:\n"
         balance_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        balance_text += "📈 راه‌های افزایش:\n\n"
-        balance_text += "🎮 بازی و برد\n"
-        balance_text += "💎 واریز مستقیم\n"
-        balance_text += "🎁 دعوت دوستان"
+        balance_text += "🎮 برد در بازی‌ها\n"
+        balance_text += "💎 واریز Stars\n"
+        balance_text += "🎁 دعوت دوستان\n\n"
+        balance_text += "💪 همین الان شروع کن!"
         
         await query.edit_message_text(
             balance_text,
@@ -437,19 +460,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_data['games_played'] > 0:
             win_rate = (user_data['total_wins'] / user_data['games_played']) * 100
         
-        stats_text = "╔═══════════════════╗\n"
-        stats_text += "║    📊 آمار من     ║\n"
-        stats_text += "╚═══════════════════╝\n\n"
-        stats_text += f"💰 موجودی: {user_data['balance']} 🦮\n\n"
+        stats_text = "📊 ━━━━━━━━━━━━━━━━━━ 📊\n"
+        stats_text += "      آمار شما      \n"
+        stats_text += "📊 ━━━━━━━━━━━━━━━━━━ 📊\n\n"
+        stats_text += f"💰 کیف پول: {user_data['balance']} ⭐\n\n"
+        stats_text += "🎮 ━━━ آمار بازی‌ها ━━━ 🎮\n\n"
+        stats_text += f"🎯 کل بازی‌ها: {user_data['games_played']}\n"
+        stats_text += f"✅ برد: {user_data['total_wins']} بازی\n"
+        stats_text += f"❌ باخت: {user_data['total_losses']} بازی\n"
+        stats_text += f"📈 نرخ برد: {win_rate:.1f}%\n\n"
         stats_text += "━━━━━━━━━━━━━━━━━━\n"
-        stats_text += "🎮 آمار بازی‌ها:\n"
-        stats_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        stats_text += f"📊 تعداد: {user_data['games_played']}\n"
-        stats_text += f"✅ برد: {user_data['total_wins']}\n"
-        stats_text += f"❌ باخت: {user_data['total_losses']}\n"
-        stats_text += f"📈 درصد برد: {win_rate:.1f}%\n\n"
-        stats_text += "━━━━━━━━━━━━━━━━━━\n"
-        stats_text += f"🎁 دعوت‌ها: {len(user_data.get('referrals', []))}"
+        stats_text += f"🎁 دعوت‌های موفق: {len(user_data.get('referrals', []))} نفر\n"
+        stats_text += f"💎 درآمد دعوت: {len(user_data.get('referrals', []))*REFERRAL_REWARD} ⭐\n\n"
+        stats_text += "🔥 به راه خود ادامه بده! 🔥"
         
         await query.edit_message_text(
             stats_text,
@@ -458,41 +481,43 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "deposit":
-        deposit_text = "╔═══════════════════╗\n"
-        deposit_text += "║   💎 واریز Dogs    ║\n"
-        deposit_text += "╚═══════════════════╝\n\n"
-        deposit_text += "━━━━━━━━━━━━━━━━━━\n"
-        deposit_text += "📝 مراحل واریز:\n"
+        deposit_text = "💎 ━━━━━━━━━━━━━━━━━━ 💎\n"
+        deposit_text += "      واریز آسان Stars     \n"
+        deposit_text += "💎 ━━━━━━━━━━━━━━━━━━ 💎\n\n"
+        deposit_text += "✨ فقط 3 قدم تا افزایش موجودی! ✨\n\n"
         deposit_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        deposit_text += f"1️⃣ وارد گروه {CHANNEL_USERNAME} بشوید\n\n"
-        deposit_text += "2️⃣ روی پیام پین شده ادمین بنویسید\n"
-        deposit_text += "   💬 مثال: Ultra10 Dogs\n\n"
-        deposit_text += "3️⃣ بعد از بررسی و تایید موجودی\n"
-        deposit_text += "   شما افزایش می‌یابد\n\n"
-        deposit_text += "4️⃣ واریز فقط اولترا انجام میشه\n"
-        deposit_text += "   هیچ ارزی جز Dogs پذیرفته نمی‌شود\n\n"
+        deposit_text += "1️⃣ روی دکمه زیر کلیک کن 👇\n\n"
+        deposit_text += "2️⃣ روی پست Stars بزن ⭐\n"
+        deposit_text += "   (هر ⭐ = 1 ⭐ موجودی)\n\n"
+        deposit_text += "3️⃣ بات خودکار Stars رو\n"
+        deposit_text += "   به حسابت اضافه می‌کنه! 🎉\n\n"
         deposit_text += "━━━━━━━━━━━━━━━━━━\n"
-        deposit_text += f"🆔 شناسه شما:\n   └─ {user_id}\n"
-        deposit_text += "━━━━━━━━━━━━━━━━━━"
+        deposit_text += f"🆔 شناسه شما: {user_id}\n"
+        deposit_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        deposit_text += "⚡️ سریع و امن! ⚡️"
+        
+        keyboard = [
+            [InlineKeyboardButton("💎 واریز Stars", url=DEPOSIT_POST_LINK)],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_main")]
+        ]
         
         await query.edit_message_text(
             deposit_text,
-            reply_markup=get_back_only_keyboard()
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
     
     if data == "withdraw":
         if user_data['balance'] <= 0:
-            error_text = "╔═══════════════════╗\n"
-            error_text += "║   ⚠️ موجودی صفر   ║\n"
-            error_text += "╚═══════════════════╝\n\n"
-            error_text += "موجودی شما برای برداشت\n"
-            error_text += "کافی نیست!\n\n"
-            error_text += "━━━━━━━━━━━━━━━━━━\n"
-            error_text += "💡 افزایش موجودی:\n"
-            error_text += "━━━━━━━━━━━━━━━━━━\n\n"
-            error_text += "🎮 بازی کنید\n"
-            error_text += "💎 واریز کنید"
+            error_text = "⚠️ ━━━━━━━━━━━━━━━━━━ ⚠️\n"
+            error_text += "      موجودی ناکافی!      \n"
+            error_text += "⚠️ ━━━━━━━━━━━━━━━━━━ ⚠️\n\n"
+            error_text += "😕 متاسفانه موجودی کافی نیست!\n\n"
+            error_text += "💡 راه‌حل‌ها:\n\n"
+            error_text += "💎 واریز Stars\n"
+            error_text += "🎮 بازی و برد\n"
+            error_text += "🎁 دعوت دوستان\n\n"
+            error_text += "🚀 همین الان شارژ کن!"
             
             await query.answer("❌ موجودی صفر است!", show_alert=True)
             await query.edit_message_text(
@@ -504,15 +529,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_data['games_played'] < MIN_GAMES_FOR_WITHDRAWAL:
             remaining_games = MIN_GAMES_FOR_WITHDRAWAL - user_data['games_played']
             
-            error_text = "╔═══════════════════╗\n"
-            error_text += "║   ⚠️ شرط برداشت   ║\n"
-            error_text += "╚═══════════════════╝\n\n"
-            error_text += f"🎮 حداقل {MIN_GAMES_FOR_WITHDRAWAL} بازی الزامی\n\n"
+            error_text = "🎮 ━━━━━━━━━━━━━━━━━━ 🎮\n"
+            error_text += "    شرط برای برداشت!    \n"
+            error_text += "🎮 ━━━━━━━━━━━━━━━━━━ 🎮\n\n"
+            error_text += f"⚠️ برای برداشت باید حداقل\n"
+            error_text += f"   {MIN_GAMES_FOR_WITHDRAWAL} بازی انجام بدی!\n\n"
             error_text += "━━━━━━━━━━━━━━━━━━\n"
-            error_text += f"📊 بازی‌های شما: {user_data['games_played']}\n"
-            error_text += f"⚠️ باقیمانده: {remaining_games} بازی\n"
+            error_text += f"📊 بازی‌های تو: {user_data['games_played']}\n"
+            error_text += f"⚡️ باقیمانده: {remaining_games} بازی\n"
             error_text += "━━━━━━━━━━━━━━━━━━\n\n"
-            error_text += "💡 ابتدا بازی کنید!"
+            error_text += "🎯 بریم بازی کنیم! 🔥"
             
             await query.answer(f"❌ {remaining_games} بازی دیگر لازم است!", show_alert=True)
             await query.edit_message_text(
@@ -521,39 +547,56 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        if user_data['balance'] < MIN_WITHDRAWAL:
-            error_text = "╔═══════════════════╗\n"
-            error_text += "║  ⚠️ حداقل برداشت  ║\n"
-            error_text += "╚═══════════════════╝\n\n"
-            error_text += f"💰 موجودی: {user_data['balance']} 🦮\n"
-            error_text += f"✅ حداقل: {MIN_WITHDRAWAL} 🦮\n"
-            error_text += f"⚠️ کمبود: {MIN_WITHDRAWAL - user_data['balance']} 🦮\n\n"
-            error_text += "━━━━━━━━━━━━━━━━━━\n"
-            error_text += "💡 موجودی را افزایش دهید!"
-            
-            await query.answer(f"❌ حداقل {MIN_WITHDRAWAL} 🦮 لازم است!", show_alert=True)
-            await query.edit_message_text(
-                error_text,
-                reply_markup=get_back_only_keyboard()
-            )
-            return
-        
-        withdraw_text = "╔═══════════════════╗\n"
-        withdraw_text += "║  💸 برداشت Dogs   ║\n"
-        withdraw_text += "╚═══════════════════╝\n\n"
-        withdraw_text += f"💰 موجودی: {user_data['balance']} 🦮\n"
-        withdraw_text += f"✅ حداقل: {MIN_WITHDRAWAL} 🦮\n"
-        withdraw_text += f"🎮 بازی‌ها: {user_data['games_played']}\n\n"
+        withdraw_text = "💸 ━━━━━━━━━━━━━━━━━━ 💸\n"
+        withdraw_text += "     برداشت جوایز     \n"
+        withdraw_text += "💸 ━━━━━━━━━━━━━━━━━━ 💸\n\n"
+        withdraw_text += f"💰 موجودی شما: {user_data['balance']} ⭐\n"
+        withdraw_text += f"🎮 بازی‌های انجام شده: {user_data['games_played']}\n\n"
+        withdraw_text += "🎁 ━━━ جوایز شگفت‌انگیز ━━━ 🎁\n\n"
+        withdraw_text += "🧸 تدی - فقط 15 ⭐\n"
+        withdraw_text += "🌹 گل رز - فقط 25 ⭐\n"
+        withdraw_text += "🚀 موشک - فقط 50 ⭐\n\n"
         withdraw_text += "━━━━━━━━━━━━━━━━━━\n"
-        withdraw_text += "📝 اطلاعات لازم:\n"
-        withdraw_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        withdraw_text += "• نام کاربری @\n"
-        withdraw_text += "• ایدی عددی\n\n"
-        withdraw_text += "💬 مثال:\n@username\n123456789"
+        withdraw_text += "✨ جایزه رو انتخاب کن! ✨"
         
-        context.user_data['waiting_for_withdrawal'] = True
         await query.edit_message_text(
             withdraw_text,
+            reply_markup=get_withdrawal_keyboard()
+        )
+        return
+    
+    if data.startswith("withdraw_"):
+        gift_type = data.split("_")[1]
+        gift_data = WITHDRAWAL_OPTIONS.get(gift_type)
+        
+        if not gift_data:
+            await query.answer("❌ گزینه نامعتبر!", show_alert=True)
+            return
+        
+        required_amount = gift_data['amount']
+        
+        if user_data['balance'] < required_amount:
+            shortage = required_amount - user_data['balance']
+            await query.answer(f"❌ موجودی کافی نیست! {shortage} ⭐ کم دارید", show_alert=True)
+            return
+        
+        # ذخیره اطلاعات برای دریافت آیدی
+        context.user_data['withdrawal_gift'] = gift_type
+        context.user_data['withdrawal_amount'] = required_amount
+        context.user_data['waiting_for_withdrawal_id'] = True
+        
+        id_text = "╔═══════════════════╗\n"
+        id_text += "║   📝 ارسال آیدی   ║\n"
+        id_text += "╚═══════════════════╝\n\n"
+        id_text += f"🎁 گزینه: {gift_data['name']}\n"
+        id_text += f"💰 مبلغ: {required_amount} ⭐\n\n"
+        id_text += "━━━━━━━━━━━━━━━━━━\n"
+        id_text += "💬 لطفاً آیدی خود را برای\n"
+        id_text += "واریز ارسال کنید:\n\n"
+        id_text += "📝 مثال:\n@username\nیا\n123456789"
+        
+        await query.edit_message_text(
+            id_text,
             reply_markup=get_back_only_keyboard()
         )
         return
@@ -562,18 +605,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot_username = (await context.bot.get_me()).username
         referral_link = f"https://t.me/{bot_username}?start=ref{user_id}"
         
-        referral_text = "╔═══════════════════╗\n"
-        referral_text += "║  🎁 دعوت دوستان   ║\n"
-        referral_text += "╚═══════════════════╝\n\n"
-        referral_text += f"🎁 هر دعوت = {REFERRAL_REWARD} 🦮\n\n"
+        referral_text = "🎁 ━━━━━━━━━━━━━━━━━━ 🎁\n"
+        referral_text += "   دعوت دوستان = درآمد!   \n"
+        referral_text += "🎁 ━━━━━━━━━━━━━━━━━━ 🎁\n\n"
+        referral_text += f"✨ هر دوست = {REFERRAL_REWARD} ⭐ به کیف پول شما!\n\n"
         referral_text += "━━━━━━━━━━━━━━━━━━\n"
-        referral_text += "🔗 لینک اختصاصی:\n"
+        referral_text += "🔗 لینک اختصاصی شما:\n"
         referral_text += "━━━━━━━━━━━━━━━━━━\n\n"
         referral_text += f"{referral_link}\n\n"
-        referral_text += "━━━━━━━━━━━━━━━━━━\n"
-        referral_text += f"👥 دعوت‌ها: {len(user_data.get('referrals', []))}\n"
-        referral_text += f"💰 درآمد: {len(user_data.get('referrals', []))*REFERRAL_REWARD} 🦮\n"
-        referral_text += "━━━━━━━━━━━━━━━━━━"
+        referral_text += "📊 ━━━ آمار شما ━━━ 📊\n\n"
+        referral_text += f"👥 دعوت‌های موفق: {len(user_data.get('referrals', []))} نفر\n"
+        referral_text += f"💰 کل درآمد: {len(user_data.get('referrals', []))*REFERRAL_REWARD} ⭐\n\n"
+        referral_text += "🚀 بیشتر دعوت کن، بیشتر ببر! 🚀"
         
         await query.edit_message_text(
             referral_text,
@@ -584,14 +627,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "support":
         context.user_data['waiting_for_support'] = True
         
-        support_text = "╔═══════════════════╗\n"
-        support_text += "║    📞 پشتیبانی     ║\n"
-        support_text += "╚═══════════════════╝\n\n"
-        support_text += "💬 پیام خود را برای\n"
-        support_text += "تیم پشتیبانی ارسال کنید\n\n"
-        support_text += "━━━━━━━━━━━━━━━━━━\n"
-        support_text += "⚡️ پیام شما مستقیماً\n"
-        support_text += "به ادمین ارسال می‌شود"
+        support_text = "📞 ━━━━━━━━━━━━━━━━━━ 📞\n"
+        support_text += "      پشتیبانی 24/7      \n"
+        support_text += "📞 ━━━━━━━━━━━━━━━━━━ 📞\n\n"
+        support_text += "💬 سوال یا مشکلی داری?\n"
+        support_text += "تیم ما آماده کمکه! 🤝\n\n"
+        support_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        support_text += "✍️ پیامت رو بنویس و ارسال کن\n\n"
+        support_text += "⚡️ مستقیم به ادمین می‌رسه!\n"
+        support_text += "⏱ در اسرع وقت پاسخ می‌دیم"
         
         await query.edit_message_text(
             support_text,
@@ -628,53 +672,53 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
         return
     
-    if data == "admin_dogs_stats" and user_id == ADMIN_ID:
+    if data == "admin_stars_stats" and user_id == ADMIN_ID:
         total_balance = sum(u['balance'] for u in users_db.values())
-        net_profit = total_dogs_lost - total_dogs_earned
+        net_profit = total_stars_lost - total_stars_earned
         
-        dogs_text = "╔═══════════════════╗\n"
-        dogs_text += "║  💰 آمار Dogs     ║\n"
-        dogs_text += "╚═══════════════════╝\n\n"
-        dogs_text += "━━━━━━━━━━━━━━━━━━\n"
-        dogs_text += "📊 آمار کلی سیستم:\n"
-        dogs_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        dogs_text += f"✅ کل Dogs کسب شده:\n"
-        dogs_text += f"   └─ {total_dogs_earned} 🦮\n\n"
-        dogs_text += f"❌ کل Dogs از دست رفته:\n"
-        dogs_text += f"   └─ {total_dogs_lost} 🦮\n\n"
-        dogs_text += f"💎 سود خالص سیستم:\n"
-        dogs_text += f"   └─ {net_profit} 🦮\n\n"
-        dogs_text += f"💰 کل موجودی کاربران:\n"
-        dogs_text += f"   └─ {total_balance} 🦮\n\n"
-        dogs_text += "━━━━━━━━━━━━━━━━━━\n"
+        stars_text = "╔═══════════════════╗\n"
+        stars_text += "║  ⭐ آمار Stars    ║\n"
+        stars_text += "╚═══════════════════╝\n\n"
+        stars_text += "━━━━━━━━━━━━━━━━━━\n"
+        stars_text += "📊 آمار کلی سیستم:\n"
+        stars_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        stars_text += f"✅ کل Stars کسب شده:\n"
+        stars_text += f"   └─ {total_stars_earned} ⭐\n\n"
+        stars_text += f"❌ کل Stars از دست رفته:\n"
+        stars_text += f"   └─ {total_stars_lost} ⭐\n\n"
+        stars_text += f"💎 سود خالص سیستم:\n"
+        stars_text += f"   └─ {net_profit} ⭐\n\n"
+        stars_text += f"💰 کل موجودی کاربران:\n"
+        stars_text += f"   └─ {total_balance} ⭐\n\n"
+        stars_text += "━━━━━━━━━━━━━━━━━━\n"
         
         # نمودار ساده
-        if total_dogs_earned + total_dogs_lost > 0:
-            earned_percent = (total_dogs_earned / (total_dogs_earned + total_dogs_lost)) * 100
+        if total_stars_earned + total_stars_lost > 0:
+            earned_percent = (total_stars_earned / (total_stars_earned + total_stars_lost)) * 100
             lost_percent = 100 - earned_percent
-            dogs_text += f"📈 نمودار:\n"
-            dogs_text += f"   ✅ برد: {earned_percent:.1f}%\n"
-            dogs_text += f"   ❌ باخت: {lost_percent:.1f}%"
+            stars_text += f"📈 نمودار:\n"
+            stars_text += f"   ✅ برد: {earned_percent:.1f}%\n"
+            stars_text += f"   ❌ باخت: {lost_percent:.1f}%"
         
-        await query.edit_message_text(dogs_text, reply_markup=get_admin_keyboard())
+        await query.edit_message_text(stars_text, reply_markup=get_admin_keyboard())
         return
     
-    if data == "admin_reset_dogs_stats" and user_id == ADMIN_ID:
+    if data == "admin_reset_stars_stats" and user_id == ADMIN_ID:
         # بازیابی آمار
-        total_dogs_earned = 0
-        total_dogs_lost = 0
+        total_stars_earned = 0
+        total_stars_lost = 0
         
         reset_text = "╔═══════════════════╗\n"
         reset_text += "║  🔄 بازیابی آمار  ║\n"
         reset_text += "╚═══════════════════╝\n\n"
-        reset_text += "✅ آمار Dogs با موفقیت\n"
+        reset_text += "✅ آمار Stars با موفقیت\n"
         reset_text += "بازیابی شد!\n\n"
         reset_text += "━━━━━━━━━━━━━━━━━━\n"
         reset_text += "📊 آمار جدید:\n"
         reset_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        reset_text += "✅ کل Dogs کسب شده: 0 🦮\n"
-        reset_text += "❌ کل Dogs از دست رفته: 0 🦮\n"
-        reset_text += "💎 سود خالص سیستم: 0 🦮"
+        reset_text += "✅ کل Stars کسب شده: 0 ⭐\n"
+        reset_text += "❌ کل Stars از دست رفته: 0 ⭐\n"
+        reset_text += "💎 سود خالص سیستم: 0 ⭐"
         
         await query.edit_message_text(reset_text, reply_markup=get_admin_keyboard())
         return
@@ -690,7 +734,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = "✅" if game['won'] else "❌"
             username = game.get('username', 'unknown')
             games_text += f"{result} @{username}\n"
-            games_text += f"   {game['game_type']} │ {game['bet_amount']} 🦮\n"
+            games_text += f"   {game['game_type']} │ {game['bet_amount']} ⭐\n"
             games_text += "━━━━━━━━━━━━━━━━━━\n"
         
         if not recent_games:
@@ -760,9 +804,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             withdrawal_text += "هیچ درخواستی وجود ندارد"
         else:
             for w in pending_withdrawals:
+                gift_name = WITHDRAWAL_OPTIONS.get(w.get('gift_type', 'teddy'), {}).get('name', 'نامشخص')
                 withdrawal_text += f"👤 {w['username']}\n"
                 withdrawal_text += f"🆔 {w['user_id']}\n"
-                withdrawal_text += f"💰 {w['amount']} 🦮\n"
+                withdrawal_text += f"🎁 {gift_name}\n"
+                withdrawal_text += f"💰 {w['amount']} ⭐\n"
+                withdrawal_text += f"📝 آیدی: {w['withdrawal_id']}\n"
                 withdrawal_text += "━━━━━━━━━━━━━━━━━━\n"
         
         await query.edit_message_text(withdrawal_text, reply_markup=get_admin_keyboard())
@@ -809,49 +856,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
-    chat_type = update.message.chat.type
     
-    if chat_type in ['group', 'supergroup'] and user_id == ADMIN_ID:
-        if update.message.reply_to_message:
-            if text.startswith('+') or text.startswith('-'):
-                try:
-                    amount = int(text)
-                    target_user_id = update.message.reply_to_message.from_user.id
-                    target_username = update.message.reply_to_message.from_user.username
-                    
-                    if target_user_id not in users_db:
-                        create_user(target_user_id, target_username)
-                    
-                    if amount > 0:
-                        reason = "افزایش توسط ادمین در گروه"
-                    else:
-                        reason = "کاهش توسط ادمین در گروه"
-                    
-                    await update_balance(target_user_id, amount, context, reason)
-                    
-                    new_balance = users_db[target_user_id]['balance']
-                    
-                    result_text = f"{'✅' if amount > 0 else '⚠️'} موجودی تغییر کرد\n\n"
-                    result_text += f"👤 @{target_username or target_user_id}\n"
-                    result_text += f"{'➕' if amount > 0 else '➖'} {abs(amount)} 🦮\n"
-                    result_text += f"💰 موجودی: {new_balance} 🦮"
-                    
-                    await update.message.reply_text(result_text)
-                    return
-                except ValueError:
-                    await update.message.reply_text("❌ فرمت نادرست!\n\n📝 مثال: +100 یا -50")
-                    return
-                except Exception as e:
-                    logger.error(f"خطا در تغییر موجودی: {e}")
-                    await update.message.reply_text(f"❌ خطا: {str(e)}")
-                    return
+    # حذف سیستم + و - در گروه
+    # chat_type = update.message.chat.type
+    # if chat_type in ['group', 'supergroup'] and user_id == ADMIN_ID:
+    #     ... (کد قبلی حذف شد)
     
     if context.user_data.get('waiting_for_custom_bet'):
         try:
             bet_amount = int(text.strip())
             
             if bet_amount < MIN_BET:
-                error_text = f"❌ مبلغ باید حداقل {MIN_BET} 🦮 باشد!\n\n"
+                error_text = f"❌ مبلغ باید حداقل {MIN_BET} ⭐ باشد!\n\n"
                 error_text += "💬 دوباره وارد کنید:"
                 
                 await update.message.reply_text(error_text)
@@ -860,8 +876,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_data = get_user(user_id)
             if user_data['balance'] < bet_amount:
                 error_text = "❌ موجودی کافی نیست!\n\n"
-                error_text += f"💰 موجودی: {user_data['balance']} 🦮\n"
-                error_text += f"💎 درخواستی: {bet_amount} 🦮"
+                error_text += f"💰 موجودی: {user_data['balance']} ⭐\n"
+                error_text += f"💎 درخواستی: {bet_amount} ⭐"
                 
                 await update.message.reply_text(error_text)
                 return
@@ -883,7 +899,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 loading_text += "╚═══════════════════╝\n\n"
                 loading_text += "⏳ در حال انجام بازی...\n\n"
                 loading_text += "━━━━━━━━━━━━━━━━━━\n"
-                loading_text += f"💰 شرط: {bet_amount} 🦮\n"
+                loading_text += f"💰 شرط: {bet_amount} ⭐\n"
                 loading_text += "━━━━━━━━━━━━━━━━━━"
                 
                 await context.bot.edit_message_text(
@@ -914,8 +930,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_text += f"🎮 بازی: {GAME_NAMES[game_type]}\n"
                 result_text += f"🎯 نتیجه: {dice_value}\n"
                 result_text += "━━━━━━━━━━━━━━━━━━\n\n"
-                result_text += f"💰 شرط: {bet_amount} 🦮\n"
-                result_text += f"🎁 برد: {reward} 🦮\n\n"
+                result_text += f"💰 شرط: {bet_amount} ⭐\n"
+                result_text += f"🎁 برد: {reward} ⭐\n\n"
                 result_text += "━━━━━━━━━━━━━━━━━━\n"
                 
                 users_db[user_id]["total_wins"] += 1
@@ -930,7 +946,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_text += f"🎮 بازی: {GAME_NAMES[game_type]}\n"
                 result_text += f"🎯 نتیجه: {dice_value}\n"
                 result_text += "━━━━━━━━━━━━━━━━━━\n\n"
-                result_text += f"💸 باخت: {bet_amount} 🦮\n\n"
+                result_text += f"💸 باخت: {bet_amount} ⭐\n\n"
                 result_text += "━━━━━━━━━━━━━━━━━━\n"
                 
                 users_db[user_id]["total_losses"] += 1
@@ -949,7 +965,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             updated_user = get_user(user_id)
             result_text += f"💰 موجودی جدید:\n"
-            result_text += f"   └─ {updated_user['balance']} 🦮"
+            result_text += f"   └─ {updated_user['balance']} ⭐"
             
             # ویرایش پیام اصلی
             if game_message_id:
@@ -971,14 +987,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فقط عدد وارد کنید!\n\n📝 مثال: 25")
             return
     
-    if context.user_data.get('waiting_for_withdrawal'):
+    if context.user_data.get('waiting_for_withdrawal_id'):
         user_data = get_user(user_id)
+        gift_type = context.user_data.get('withdrawal_gift')
+        withdrawal_amount = context.user_data.get('withdrawal_amount')
+        gift_data = WITHDRAWAL_OPTIONS.get(gift_type)
+        
+        # کسر موجودی
+        users_db[user_id]['balance'] -= withdrawal_amount
         
         withdrawal_data = {
             "user_id": user_id,
             "username": update.effective_user.username,
-            "amount": user_data['balance'],
-            "withdrawal_info": text,
+            "amount": withdrawal_amount,
+            "gift_type": gift_type,
+            "gift_name": gift_data['name'],
+            "withdrawal_id": text,
             "status": "pending",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -988,11 +1012,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             admin_notif = "╔═══════════════════╗\n"
             admin_notif += "║  🔔 درخواست جدید   ║\n"
             admin_notif += "╚═══════════════════╝\n\n"
-            admin_notif += f"👤 @{update.effective_user.username}\n"
+            admin_notif += f"👤 @{update.effective_user.username or 'بدون_یوزرنیم'}\n"
             admin_notif += f"🆔 {user_id}\n"
-            admin_notif += f"💰 {user_data['balance']} 🦮\n\n"
+            admin_notif += f"🎁 {gift_data['name']}\n"
+            admin_notif += f"💰 {withdrawal_amount} ⭐\n\n"
             admin_notif += f"━━━━━━━━━━━━━━━━━━\n"
-            admin_notif += f"📝 اطلاعات:\n{text}"
+            admin_notif += f"📝 آیدی واریز:\n{text}"
             
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
@@ -1001,15 +1026,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
         
-        context.user_data['waiting_for_withdrawal'] = False
+        context.user_data['waiting_for_withdrawal_id'] = False
+        context.user_data.pop('withdrawal_gift', None)
+        context.user_data.pop('withdrawal_amount', None)
         
-        success_text = "╔═══════════════════╗\n"
-        success_text += "║    ✅ ثبت شد!     ║\n"
-        success_text += "╚═══════════════════╝\n\n"
-        success_text += "درخواست برداشت شما ثبت شد\n\n"
-        success_text += "━━━━━━━━━━━━━━━━━━\n"
-        success_text += "⏳ بعد از بررسی،\n"
-        success_text += "Dogs واریز می‌شود"
+        success_text = "✅ ━━━━━━━━━━━━━━━━━━ ✅\n"
+        success_text += "    درخواست ثبت شد!    \n"
+        success_text += "✅ ━━━━━━━━━━━━━━━━━━ ✅\n\n"
+        success_text += "🎉 درخواست برداشت ثبت شد!\n\n"
+        success_text += f"💰 {withdrawal_amount} ⭐ از موجودی\n"
+        success_text += "   کسر شد\n\n"
+        success_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        success_text += "⏱ تیم ما داره بررسی می‌کنه\n"
+        success_text += "🎁 به زودی هدیه ارسال می‌شه!\n\n"
+        success_text += "💌 ممنون از صبرت!"
         
         await update.message.reply_text(
             success_text,
@@ -1022,7 +1052,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             support_notif = "╔═══════════════════╗\n"
             support_notif += "║   📞 پیام جدید    ║\n"
             support_notif += "╚═══════════════════╝\n\n"
-            support_notif += f"👤 @{update.effective_user.username}\n"
+            support_notif += f"👤 @{update.effective_user.username or 'بدون_یوزرنیم'}\n"
             support_notif += f"🆔 {user_id}\n\n"
             support_notif += f"━━━━━━━━━━━━━━━━━━\n"
             support_notif += f"💬 پیام:\n{text}"
@@ -1070,7 +1100,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 success_text += "║   ✅ انجام شد!    ║\n"
                 success_text += "╚═══════════════════╝\n\n"
                 success_text += f"🆔 {target_user_id}\n"
-                success_text += f"➕ {amount} 🦮"
+                success_text += f"➕ {amount} ⭐"
                 
                 await update.message.reply_text(
                     success_text,
@@ -1093,7 +1123,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 success_text += "║   ✅ انجام شد!    ║\n"
                 success_text += "╚═══════════════════╝\n\n"
                 success_text += f"🆔 {target_user_id}\n"
-                success_text += f"➖ {amount} 🦮"
+                success_text += f"➖ {amount} ⭐"
                 
                 await update.message.reply_text(
                     success_text,
