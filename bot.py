@@ -259,6 +259,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_text, reply_markup=get_main_keyboard(user_id == ADMIN_ID))
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global total_dogs_earned, total_dogs_lost
+    
     query = update.callback_query
     await query.answer()
     
@@ -658,8 +660,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "admin_reset_dogs_stats" and user_id == ADMIN_ID:
-        global total_dogs_earned, total_dogs_lost
-        
         # بازیابی آمار
         total_dogs_earned = 0
         total_dogs_lost = 0
