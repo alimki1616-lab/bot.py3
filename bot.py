@@ -169,6 +169,7 @@ def get_admin_keyboard():
         [InlineKeyboardButton("👥 آمار کاربران", callback_data="admin_users"),
          InlineKeyboardButton("🎮 بازی‌ها", callback_data="admin_games")],
         [InlineKeyboardButton("💰 آمار Dogs", callback_data="admin_dogs_stats")],
+        [InlineKeyboardButton("🔄 بازیابی آمار Dogs", callback_data="admin_reset_dogs_stats")],
         [InlineKeyboardButton("➕ افزایش موجودی", callback_data="admin_add_balance"),
          InlineKeyboardButton("➖ کاهش موجودی", callback_data="admin_reduce_balance")],
         [InlineKeyboardButton("🚫 بلاک", callback_data="admin_block"),
@@ -458,19 +459,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deposit_text = "╔═══════════════════╗\n"
         deposit_text += "║   💎 واریز Dogs    ║\n"
         deposit_text += "╚═══════════════════╝\n\n"
-        deposit_text += f"🔗 کانال: {CHANNEL_USERNAME}\n\n"
         deposit_text += "━━━━━━━━━━━━━━━━━━\n"
         deposit_text += "📝 مراحل واریز:\n"
         deposit_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        deposit_text += "1️⃣ در کانال عضو شوید\n"
-        deposit_text += "2️⃣ پیام پین شده را ببینید\n"
-        deposit_text += "3️⃣ Dogs را انتقال دهید\n"
-        deposit_text += "4️⃣ منتظر تایید باشید\n\n"
+        deposit_text += f"1️⃣ وارد گروه {CHANNEL_USERNAME} بشوید\n\n"
+        deposit_text += "2️⃣ روی پیام پین شده ادمین بنویسید\n"
+        deposit_text += "   💬 مثال: Ultra10 Dogs\n\n"
+        deposit_text += "3️⃣ بعد از بررسی و تایید موجودی\n"
+        deposit_text += "   شما افزایش می‌یابد\n\n"
+        deposit_text += "4️⃣ واریز فقط اولترا انجام میشه\n"
+        deposit_text += "   هیچ ارزی جز Dogs پذیرفته نمی‌شود\n\n"
         deposit_text += "━━━━━━━━━━━━━━━━━━\n"
         deposit_text += f"🆔 شناسه شما:\n   └─ {user_id}\n"
-        deposit_text += "━━━━━━━━━━━━━━━━━━\n\n"
-        deposit_text += "⚡️ پس از تایید، موجودی\n"
-        deposit_text += "به حساب شما اضافه می‌شود"
+        deposit_text += "━━━━━━━━━━━━━━━━━━"
         
         await query.edit_message_text(
             deposit_text,
@@ -654,6 +655,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dogs_text += f"   ❌ باخت: {lost_percent:.1f}%"
         
         await query.edit_message_text(dogs_text, reply_markup=get_admin_keyboard())
+        return
+    
+    if data == "admin_reset_dogs_stats" and user_id == ADMIN_ID:
+        global total_dogs_earned, total_dogs_lost
+        
+        # بازیابی آمار
+        total_dogs_earned = 0
+        total_dogs_lost = 0
+        
+        reset_text = "╔═══════════════════╗\n"
+        reset_text += "║  🔄 بازیابی آمار  ║\n"
+        reset_text += "╚═══════════════════╝\n\n"
+        reset_text += "✅ آمار Dogs با موفقیت\n"
+        reset_text += "بازیابی شد!\n\n"
+        reset_text += "━━━━━━━━━━━━━━━━━━\n"
+        reset_text += "📊 آمار جدید:\n"
+        reset_text += "━━━━━━━━━━━━━━━━━━\n\n"
+        reset_text += "✅ کل Dogs کسب شده: 0 🦮\n"
+        reset_text += "❌ کل Dogs از دست رفته: 0 🦮\n"
+        reset_text += "💎 سود خالص سیستم: 0 🦮"
+        
+        await query.edit_message_text(reset_text, reply_markup=get_admin_keyboard())
         return
     
     if data == "admin_games" and user_id == ADMIN_ID:
