@@ -17,10 +17,10 @@ ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 CHANNEL_USERNAME = '@DepositStarsBet'
 DEPOSIT_POST_LINK = 'https://t.me/DepositStarsBet/2'
 MIN_WITHDRAWAL = 15
-MIN_GAMES_FOR_WITHDRAWAL = 5
+MIN_WINS_FOR_WITHDRAWAL = 5  # 🔧 تغییر از MIN_GAMES به MIN_WINS
+MIN_BET = 1
 REFERRAL_REWARD = 1
 INITIAL_BALANCE = 2
-MIN_BET = 1
 
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN تنظیم نشده! لطفاً در .env یا Railway تنظیم کنید.")
@@ -124,12 +124,12 @@ LANGUAGES = {
         'charge_now': '🚀 همین الان شارژ کن!',
         'balance_zero': '❌ موجودی صفر است!',
         'withdrawal_condition': '🎮 شرط برای برداشت!',
-        'min_games_required': '⚠️ برای برداشت باید حداقل',
-        'games_complete': 'بازی انجام بدی!',
-        'your_games': '📊 بازی‌های تو:',
+        'min_wins_required': '⚠️ برای برداشت باید حداقل',  # 🔧 جدید
+        'wins_complete': 'برد داشته باشی!',  # 🔧 جدید
+        'your_wins': '📊 برد های تو:',  # 🔧 جدید
         'remaining': '⚡️ باقیمانده:',
         'lets_play': '🎯 بریم بازی کنیم! 🔥',
-        'more_games_needed': 'بازی دیگر لازم است!',
+        'more_wins_needed': 'برد دیگر لازم است!',  # 🔧 جدید
         'withdraw_prizes': '💸 برداشت جوایز',
         'completed_games': '🎮 بازی‌های انجام شده:',
         'amazing_prizes': '🎁 جوایز شگفت‌انگیز:',
@@ -259,12 +259,12 @@ LANGUAGES = {
         'charge_now': '🚀 Charge now!',
         'balance_zero': '❌ Balance is zero!',
         'withdrawal_condition': '🎮 Withdrawal Condition!',
-        'min_games_required': '⚠️ You must complete at least',
-        'games_complete': 'games to withdraw!',
-        'your_games': '📊 Your games:',
+        'min_wins_required': '⚠️ You must have at least',
+        'wins_complete': 'wins to withdraw!',
+        'your_wins': '📊 Your wins:',
         'remaining': '⚡️ Remaining:',
         'lets_play': "🎯 Let's play! 🔥",
-        'more_games_needed': 'more games needed!',
+        'more_wins_needed': 'more wins needed!',
         'withdraw_prizes': '💸 Withdraw Prizes',
         'completed_games': '🎮 Completed games:',
         'amazing_prizes': '🎁 Amazing prizes:',
@@ -394,12 +394,12 @@ LANGUAGES = {
         'charge_now': '🚀 Пополнить сейчас!',
         'balance_zero': '❌ Баланс нулевой!',
         'withdrawal_condition': '🎮 Условие для вывода!',
-        'min_games_required': '⚠️ Вы должны завершить минимум',
-        'games_complete': 'игр для вывода!',
-        'your_games': '📊 Ваши игры:',
+        'min_wins_required': '⚠️ Вы должны иметь минимум',
+        'wins_complete': 'побед для вывода!',
+        'your_wins': '📊 Ваши победы:',
         'remaining': '⚡️ Осталось:',
         'lets_play': '🎯 Давайте играть! 🔥',
-        'more_games_needed': 'еще игр нужно!',
+        'more_wins_needed': 'еще побед нужно!',
         'withdraw_prizes': '💸 Вывести призы',
         'completed_games': '🎮 Завершенные игры:',
         'amazing_prizes': '🎁 Удивительные призы:',
@@ -501,9 +501,11 @@ def create_user(user_id: int, username: str = None, referred_by: int = None):
     }
     users_db[user_id] = user_data
     
+    # 🔧 اصلاح: افزودن referral به لیست و ارسال اعلان
     if referred_by and referred_by in users_db:
         users_db[referred_by]["balance"] += REFERRAL_REWARD
         users_db[referred_by]["referrals"].append(user_id)
+        logger.info(f"✅ Referral added: {user_id} referred by {referred_by}")
     
     return users_db[user_id]
 
@@ -575,6 +577,7 @@ def get_admin_keyboard():
     keyboard = [
         [InlineKeyboardButton("👥 آمار کاربران", callback_data="admin_users"),
          InlineKeyboardButton("🎮 بازی‌ها", callback_data="admin_games")],
+        [InlineKeyboardButton("🔍 جستجوی کاربر", callback_data="admin_search_user")],  # 🔧 جدید
         [InlineKeyboardButton("⭐ آمار Stars", callback_data="admin_stars_stats")],
         [InlineKeyboardButton("🔄 بازیابی آمار Stars", callback_data="admin_reset_stars_stats")],
         [InlineKeyboardButton("➕ افزایش موجودی", callback_data="admin_add_balance"),
@@ -616,12 +619,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     username = user.username
     
+    # 🔧 اصلاح: بهبود شناسایی referred_by
     referred_by = None
-    if context.args and context.args[0].startswith('ref'):
-        try:
-            referred_by = int(context.args[0][3:])
-        except:
-            pass
+    if context.args:
+        logger.info(f"Start command args: {context.args}")
+        if len(context.args) > 0 and context.args[0].startswith('ref'):
+            try:
+                referred_by = int(context.args[0][3:])
+                logger.info(f"✅ Referral detected: User {user_id} referred by {referred_by}")
+            except ValueError as e:
+                logger.error(f"Error parsing referral code: {e}")
     
     is_member = await check_channel_membership(user_id, context)
     if not is_member:
@@ -647,6 +654,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['new_user'] = True
         context.user_data['username'] = username
         context.user_data['referred_by'] = referred_by
+        logger.info(f"New user setup: {user_id}, referred_by: {referred_by}")
         return
     
     welcome_text = f"🎮 {get_text(user_id, 'hello')} {user.first_name}!\n\n"
@@ -670,21 +678,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if context.user_data.get('new_user'):
             username = context.user_data.get('username')
             referred_by = context.user_data.get('referred_by')
+            
+            logger.info(f"Creating new user: {user_id}, username: {username}, referred_by: {referred_by}")
+            
             create_user(user_id, username, referred_by)
             users_db[user_id]['language'] = lang_code
-            context.user_data.clear()
             
-            if referred_by:
+            # 🔧 اصلاح: ارسال اعلان بهبود یافته به referrer
+            if referred_by and referred_by in users_db:
                 try:
-                    referrer_username = f"@{username}" if username else f"User {user_id}"
-                    await context.bot.send_message(
-                        chat_id=referred_by,
-                        text=f"🎉 New user joined with your link\n\n"
-                             f"👤 User: {referrer_username}\n"
-                             f"💰 {REFERRAL_REWARD} ⭐ added to your balance"
-                    )
-                except:
-                    pass
+                    referrer_username = f"@{username}" if username else f"کاربر {user_id}"
+                    referrer_lang = users_db[referred_by].get('language', 'fa')
+                    
+                    notif_text = "🎉 کاربر جدید با لینک شما عضو شد!\n\n"
+                    notif_text += f"👤 {referrer_username}\n"
+                    notif_text += f"💰 +{REFERRAL_REWARD} ⭐ به کیف پول شما اضافه شد\n\n"
+                    notif_text += f"💎 موجودی جدید: {users_db[referred_by]['balance']} ⭐"
+                    
+                    await context.bot.send_message(chat_id=referred_by, text=notif_text)
+                    logger.info(f"✅ Referral notification sent to {referred_by}")
+                except Exception as e:
+                    logger.error(f"❌ Error sending referral notification to {referred_by}: {e}")
+            
+            context.user_data.clear()
             
             user_data = users_db[user_id]
             welcome_text = f"🎮 {get_text(user_id, 'hello')} {query.from_user.first_name}!\n\n"
@@ -695,7 +711,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             users_db[user_id]['language'] = lang_code
             
-            # نمایش پیام خوش آمدید کامل با موجودی
             user_data = get_user(user_id)
             back_text = f"🎮 {get_text(user_id, 'hello')} {query.from_user.first_name}!\n\n"
             back_text += f"💰 {get_text(user_id, 'your_wallet')} {user_data['balance']} ⭐\n\n"
@@ -774,11 +789,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dice_value = dice_message.dice.value
         win = dice_value in WINNING_CONDITIONS.get(game_type, [6])
         
-        # 🔧 اصلاح: اول شرط کسر می‌شود
         await update_balance(user_id, -bet_amount, context, send_notification=False)
         
         if win:
-            # 🔧 اصلاح: در صورت برد، جایزه (2 برابر شرط) اضافه می‌شود
             reward = bet_amount * 2
             await update_balance(user_id, reward, context, f"{get_text(user_id, 'game')}: {get_text(user_id, game_type)}", send_notification=False)
             
@@ -857,6 +870,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(deposit_text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
+    # 🔧 اصلاح: شرط برداشت بر اساس تعداد برد
     if data == "withdraw":
         if user_data['balance'] <= 0:
             error_text = f"⚠️ {get_text(user_id, 'insufficient_balance_title')}\n\n"
@@ -870,16 +884,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(error_text, reply_markup=get_back_only_keyboard(user_id))
             return
         
-        if user_data['games_played'] < MIN_GAMES_FOR_WITHDRAWAL:
-            remaining_games = MIN_GAMES_FOR_WITHDRAWAL - user_data['games_played']
+        # 🔧 تغییر از games_played به total_wins
+        if user_data['total_wins'] < MIN_WINS_FOR_WITHDRAWAL:
+            remaining_wins = MIN_WINS_FOR_WITHDRAWAL - user_data['total_wins']
             
             error_text = f"🎮 {get_text(user_id, 'withdrawal_condition')}\n\n"
-            error_text += f"⚠️ {get_text(user_id, 'min_games_required')} {MIN_GAMES_FOR_WITHDRAWAL} {get_text(user_id, 'games_complete')}\n\n"
-            error_text += f"📊 {get_text(user_id, 'your_games')} {user_data['games_played']}\n"
-            error_text += f"⚡️ {get_text(user_id, 'remaining')} {remaining_games}\n\n"
+            error_text += f"⚠️ {get_text(user_id, 'min_wins_required')} {MIN_WINS_FOR_WITHDRAWAL} {get_text(user_id, 'wins_complete')}\n\n"
+            error_text += f"📊 {get_text(user_id, 'your_wins')} {user_data['total_wins']}\n"
+            error_text += f"⚡️ {get_text(user_id, 'remaining')} {remaining_wins}\n\n"
             error_text += f"🎯 {get_text(user_id, 'lets_play')}"
             
-            await query.answer(f"❌ {remaining_games} {get_text(user_id, 'more_games_needed')}", show_alert=True)
+            await query.answer(f"❌ {remaining_wins} {get_text(user_id, 'more_wins_needed')}", show_alert=True)
             await query.edit_message_text(error_text, reply_markup=get_back_only_keyboard(user_id))
             return
         
@@ -959,6 +974,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         admin_text += f"🎮 کل بازی‌ها: {total_games}"
         
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
+        return
+    
+    # 🔧 جدید: جستجوی کاربر
+    if data == "admin_search_user" and user_id == ADMIN_ID:
+        context.user_data['admin_action'] = 'search_user'
+        admin_text = "🔍 جستجوی کاربر\n\n💬 ایدی کاربر را ارسال کنید:\n\n📝 مثال:\n123456789"
+        await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
+        return
+    
+    # 🔧 جدید: نمایش جزئیات کاربر
+    if data.startswith("admin_user_detail_") and user_id == ADMIN_ID:
+        target_user_id = int(data.split("_")[3])
+        
+        if target_user_id not in users_db:
+            await query.answer("❌ کاربر یافت نشد!", show_alert=True)
+            return
+        
+        target_user = users_db[target_user_id]
+        
+        detail_text = f"👤 جزئیات کاربر\n\n"
+        detail_text += f"🆔 آیدی: {target_user_id}\n"
+        detail_text += f"👤 یوزرنیم: @{target_user.get('username', 'ندارد')}\n"
+        detail_text += f"💰 موجودی: {target_user['balance']} ⭐\n\n"
+        
+        detail_text += f"🎮 آمار بازی‌ها:\n"
+        detail_text += f"• کل بازی‌ها: {target_user['games_played']}\n"
+        detail_text += f"• برد: {target_user['total_wins']}\n"
+        detail_text += f"• باخت: {target_user['total_losses']}\n"
+        
+        if target_user['games_played'] > 0:
+            win_rate = (target_user['total_wins'] / target_user['games_played']) * 100
+            detail_text += f"• نرخ برد: {win_rate:.1f}%\n"
+        
+        detail_text += f"\n🎁 دعوت‌ها:\n"
+        detail_text += f"• تعداد دعوت‌ها: {len(target_user.get('referrals', []))}\n"
+        detail_text += f"• درآمد دعوت: {len(target_user.get('referrals', []))*REFERRAL_REWARD} ⭐\n"
+        
+        if target_user.get('referred_by'):
+            detail_text += f"• دعوت شده توسط: {target_user['referred_by']}\n"
+        
+        detail_text += f"\n⚙️ وضعیت: {'🚫 مسدود' if target_user.get('is_blocked') else '✅ فعال'}"
+        
+        await query.edit_message_text(detail_text, reply_markup=get_admin_keyboard())
         return
     
     if data == "admin_stars_stats" and user_id == ADMIN_ID:
@@ -1069,12 +1127,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
         return
     
+    # 🔧 اصلاح: ریست کردن wins بعد از تایید برداشت
     if data.startswith("approve_withdrawal_") and user_id == ADMIN_ID:
         parts = data.split("_")
         target_user_id = int(parts[2])
         withdrawal_index = int(parts[3])
         
-        # ارسال پیام تایید به کاربر
         try:
             approval_text = "✅ برداشت شما تایید شد!\n\n"
             approval_text += "🎁 هدیه شما در حال ارسال است\n"
@@ -1082,13 +1140,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await context.bot.send_message(chat_id=target_user_id, text=approval_text)
             
-            # تغییر وضعیت درخواست
+            # 🔧 اصلاح: ریست کردن total_wins به 0
+            if target_user_id in users_db:
+                users_db[target_user_id]['total_wins'] = 0
+                logger.info(f"✅ User {target_user_id} wins reset to 0 after withdrawal approval")
+            
             if withdrawal_index < len(withdrawals_db):
                 withdrawals_db[withdrawal_index]['status'] = 'approved'
             
-            # ویرایش پیام ادمین
             await query.edit_message_text(
-                text=query.message.text + "\n\n✅ تایید شد و به کاربر اطلاع داده شد",
+                text=query.message.text + "\n\n✅ تایید شد و به کاربر اطلاع داده شد\n🔄 برد های کاربر به 0 بازنشانی شد",
                 reply_markup=None
             )
         except Exception as e:
@@ -1098,7 +1159,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "back_to_main":
         context.user_data.clear()
         
-        # نمایش پیام خوش آمدید کامل با موجودی
         user_data = get_user(user_id)
         back_text = f"🎮 {get_text(user_id, 'hello')} {query.from_user.first_name}!\n\n"
         back_text += f"💰 {get_text(user_id, 'your_wallet')} {user_data['balance']} ⭐\n\n"
@@ -1157,11 +1217,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             dice_value = dice_message.dice.value
             win = dice_value in WINNING_CONDITIONS.get(game_type, [6])
             
-            # 🔧 اصلاح: اول شرط کسر می‌شود
             await update_balance(user_id, -bet_amount, context, send_notification=False)
             
             if win:
-                # 🔧 اصلاح: در صورت برد، جایزه (2 برابر شرط) اضافه می‌شود
                 reward = bet_amount * 2
                 await update_balance(user_id, reward, context, f"{get_text(user_id, 'game')}: {get_text(user_id, game_type)}", send_notification=False)
                 
@@ -1243,7 +1301,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             admin_notif += f"💰 {withdrawal_amount} ⭐\n\n"
             admin_notif += f"📝 آیدی واریز:\n{text}"
             
-            # دکمه تایید برداشت برای ادمین
             keyboard = [[InlineKeyboardButton("✅ تایید و ارسال به کاربر", callback_data=f"approve_withdrawal_{user_id}_{len(withdrawals_db)-1}")]]
             
             await context.bot.send_message(chat_id=ADMIN_ID, text=admin_notif, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1254,7 +1311,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('withdrawal_gift', None)
         context.user_data.pop('withdrawal_amount', None)
         
-        # 🔧 اصلاح: حذف پیام تکراری
         success_text = f"{get_text(user_id, 'request_submitted')}\n\n"
         success_text += f"💰 {withdrawal_amount} ⭐ {get_text(user_id, 'deducted')}\n\n"
         success_text += f"{get_text(user_id, 'team_reviewing')}\n\n"
@@ -1286,6 +1342,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id == ADMIN_ID:
         admin_action = context.user_data.get('admin_action')
+        
+        # 🔧 جدید: جستجوی کاربر
+        if admin_action == 'search_user':
+            try:
+                target_user_id = int(text.strip())
+                
+                if target_user_id not in users_db:
+                    await update.message.reply_text("❌ کاربر یافت نشد!")
+                    context.user_data['admin_action'] = None
+                    return
+                
+                target_user = users_db[target_user_id]
+                
+                detail_text = f"👤 جزئیات کاربر\n\n"
+                detail_text += f"🆔 آیدی: {target_user_id}\n"
+                detail_text += f"👤 یوزرنیم: @{target_user.get('username', 'ندارد')}\n"
+                detail_text += f"💰 موجودی: {target_user['balance']} ⭐\n\n"
+                
+                detail_text += f"🎮 آمار بازی‌ها:\n"
+                detail_text += f"• کل بازی‌ها: {target_user['games_played']}\n"
+                detail_text += f"• برد: {target_user['total_wins']}\n"
+                detail_text += f"• باخت: {target_user['total_losses']}\n"
+                
+                if target_user['games_played'] > 0:
+                    win_rate = (target_user['total_wins'] / target_user['games_played']) * 100
+                    detail_text += f"• نرخ برد: {win_rate:.1f}%\n"
+                
+                detail_text += f"\n🎁 دعوت‌ها:\n"
+                detail_text += f"• تعداد دعوت‌ها: {len(target_user.get('referrals', []))}\n"
+                detail_text += f"• درآمد دعوت: {len(target_user.get('referrals', []))*REFERRAL_REWARD} ⭐\n"
+                
+                if target_user.get('referrals'):
+                    detail_text += f"• لیست دعوت شده‌ها: {', '.join(map(str, target_user['referrals']))}\n"
+                
+                if target_user.get('referred_by'):
+                    detail_text += f"• دعوت شده توسط: {target_user['referred_by']}\n"
+                
+                detail_text += f"\n⚙️ وضعیت: {'🚫 مسدود' if target_user.get('is_blocked') else '✅ فعال'}"
+                
+                await update.message.reply_text(detail_text, reply_markup=get_admin_keyboard())
+                context.user_data['admin_action'] = None
+            except ValueError:
+                await update.message.reply_text("❌ فرمت نادرست! لطفاً فقط عدد وارد کنید.")
+            return
         
         if admin_action == 'add_balance':
             try:
@@ -1383,7 +1483,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    logger.info("ربات شروع به کار کرد...")
+    logger.info("✅ ربات شروع به کار کرد...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
