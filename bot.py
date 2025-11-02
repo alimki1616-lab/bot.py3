@@ -17,7 +17,7 @@ ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
 CHANNEL_USERNAME = '@DepositStarsBet'
 DEPOSIT_POST_LINK = 'https://t.me/DepositStarsBet/2'
 MIN_WITHDRAWAL = 15
-MIN_WINS_FOR_WITHDRAWAL = 5  # 🔧 تغییر از MIN_GAMES به MIN_WINS
+MIN_WINS_FOR_WITHDRAWAL = 5
 MIN_BET = 1
 REFERRAL_REWARD = 1
 INITIAL_BALANCE = 2
@@ -58,7 +58,6 @@ LANGUAGES = {
         'your_wallet': '💎 موجودی شما:',
         'exciting_games': '🎯 بازی‌های هیجان‌انگیز:',
         'ready_to_win': '🔥 آماده‌اید برای برد بزرگ؟',
-        'football': '⚽ فوتبال',
         'basketball': '🏀 بسکتبال',
         'dart': '🎯 دارت',
         'bowling': '🎳 بولینگ',
@@ -71,7 +70,6 @@ LANGUAGES = {
         'invite_friends': '🎁 دعوت دوستان',
         'support': '📞 پشتیبانی',
         'settings': '⚙️ تنظیمات',
-        'football_guide': '⚽ برای برد باید توپ وارد دروازه شود',
         'basketball_guide': '🏀 برای برد باید توپ داخل سبد برود',
         'dart_guide': '🎯 برای برد باید دارت به مرکز هدف بخورد',
         'bowling_guide': '🎳 برای برد باید تمام پین‌ها بیفتند',
@@ -124,12 +122,12 @@ LANGUAGES = {
         'charge_now': '🚀 همین الان شارژ کن!',
         'balance_zero': '❌ موجودی صفر است!',
         'withdrawal_condition': '🎮 شرط برای برداشت!',
-        'min_wins_required': '⚠️ برای برداشت باید حداقل',  # 🔧 جدید
-        'wins_complete': 'برد داشته باشی!',  # 🔧 جدید
-        'your_wins': '📊 برد های تو:',  # 🔧 جدید
+        'min_wins_required': '⚠️ برای برداشت باید حداقل',
+        'wins_complete': 'برد داشته باشی!',
+        'your_wins': '📊 برد های تو:',
         'remaining': '⚡️ باقیمانده:',
         'lets_play': '🎯 بریم بازی کنیم! 🔥',
-        'more_wins_needed': 'برد دیگر لازم است!',  # 🔧 جدید
+        'more_wins_needed': 'برد دیگر لازم است!',
         'withdraw_prizes': '💸 برداشت جوایز',
         'completed_games': '🎮 بازی‌های انجام شده:',
         'amazing_prizes': '🎁 جوایز شگفت‌انگیز:',
@@ -193,7 +191,6 @@ LANGUAGES = {
         'your_wallet': '💎 Your balance:',
         'exciting_games': '🎯 Exciting Games:',
         'ready_to_win': '🔥 Ready for a big win?',
-        'football': '⚽ Football',
         'basketball': '🏀 Basketball',
         'dart': '🎯 Dart',
         'bowling': '🎳 Bowling',
@@ -206,7 +203,6 @@ LANGUAGES = {
         'invite_friends': '🎁 Invite Friends',
         'support': '📞 Support',
         'settings': '⚙️ Settings',
-        'football_guide': '⚽ To win, the ball must go into the goal',
         'basketball_guide': '🏀 To win, the ball must go into the basket',
         'dart_guide': '🎯 To win, the dart must hit the center',
         'bowling_guide': '🎳 To win, all pins must fall',
@@ -328,7 +324,6 @@ LANGUAGES = {
         'your_wallet': '💎 Ваш баланс:',
         'exciting_games': '🎯 Увлекательные игры:',
         'ready_to_win': '🔥 Готовы к большому выигрышу?',
-        'football': '⚽ Футбол',
         'basketball': '🏀 Баскетбол',
         'dart': '🎯 Дартс',
         'bowling': '🎳 Боулинг',
@@ -341,7 +336,6 @@ LANGUAGES = {
         'invite_friends': '🎁 Пригласить друзей',
         'support': '📞 Поддержка',
         'settings': '⚙️ Настройки',
-        'football_guide': '⚽ Чтобы выиграть, мяч должен попасть в ворота',
         'basketball_guide': '🏀 Чтобы выиграть, мяч должен попасть в корзину',
         'dart_guide': '🎯 Чтобы выиграть, дротик должен попасть в центр',
         'bowling_guide': '🎳 Чтобы выиграть, все кегли должны упасть',
@@ -449,7 +443,6 @@ LANGUAGES = {
 }
 
 GAME_EMOJI_MAP = {
-    "football": DiceEmoji.FOOTBALL,
     "basketball": DiceEmoji.BASKETBALL,
     "dart": DiceEmoji.DARTS,
     "bowling": DiceEmoji.BOWLING,
@@ -458,7 +451,6 @@ GAME_EMOJI_MAP = {
 }
 
 WINNING_CONDITIONS = {
-    "football": [3, 4, 5],
     "basketball": [4, 5],
     "dart": [6],
     "bowling": [6],
@@ -501,7 +493,6 @@ def create_user(user_id: int, username: str = None, referred_by: int = None):
     }
     users_db[user_id] = user_data
     
-    # 🔧 اصلاح: افزودن referral به لیست و ارسال اعلان
     if referred_by and referred_by in users_db:
         users_db[referred_by]["balance"] += REFERRAL_REWARD
         users_db[referred_by]["referrals"].append(user_id)
@@ -553,12 +544,11 @@ def get_language_keyboard():
 
 def get_main_keyboard(user_id: int, is_admin=False):
     keyboard = [
-        [InlineKeyboardButton(get_text(user_id, 'football'), callback_data="game_football"),
-         InlineKeyboardButton(get_text(user_id, 'basketball'), callback_data="game_basketball")],
-        [InlineKeyboardButton(get_text(user_id, 'dart'), callback_data="game_dart"),
-         InlineKeyboardButton(get_text(user_id, 'bowling'), callback_data="game_bowling")],
-        [InlineKeyboardButton(get_text(user_id, 'slot'), callback_data="game_slot"),
-         InlineKeyboardButton(get_text(user_id, 'dice'), callback_data="game_dice")],
+        [InlineKeyboardButton(get_text(user_id, 'basketball'), callback_data="game_basketball"),
+         InlineKeyboardButton(get_text(user_id, 'dart'), callback_data="game_dart")],
+        [InlineKeyboardButton(get_text(user_id, 'bowling'), callback_data="game_bowling"),
+         InlineKeyboardButton(get_text(user_id, 'slot'), callback_data="game_slot")],
+        [InlineKeyboardButton(get_text(user_id, 'dice'), callback_data="game_dice")],
         [InlineKeyboardButton(get_text(user_id, 'my_balance'), callback_data="balance"),
          InlineKeyboardButton(get_text(user_id, 'my_stats'), callback_data="stats")],
         [InlineKeyboardButton(get_text(user_id, 'deposit'), callback_data="deposit"),
@@ -577,7 +567,7 @@ def get_admin_keyboard():
     keyboard = [
         [InlineKeyboardButton("👥 آمار کاربران", callback_data="admin_users"),
          InlineKeyboardButton("🎮 بازی‌ها", callback_data="admin_games")],
-        [InlineKeyboardButton("🔍 جستجوی کاربر", callback_data="admin_search_user")],  # 🔧 جدید
+        [InlineKeyboardButton("🔍 جستجوی کاربر", callback_data="admin_search_user")],
         [InlineKeyboardButton("⭐ آمار Stars", callback_data="admin_stars_stats")],
         [InlineKeyboardButton("🔄 بازیابی آمار Stars", callback_data="admin_reset_stars_stats")],
         [InlineKeyboardButton("➕ افزایش موجودی", callback_data="admin_add_balance"),
@@ -619,7 +609,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     username = user.username
     
-    # 🔧 اصلاح: بهبود شناسایی referred_by
     referred_by = None
     if context.args:
         logger.info(f"Start command args: {context.args}")
@@ -684,7 +673,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             create_user(user_id, username, referred_by)
             users_db[user_id]['language'] = lang_code
             
-            # 🔧 اصلاح: ارسال اعلان بهبود یافته به referrer
             if referred_by and referred_by in users_db:
                 try:
                     referrer_username = f"@{username}" if username else f"کاربر {user_id}"
@@ -772,7 +760,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(get_text(user_id, 'insufficient_balance'), show_alert=True)
             return
         
-        game_type = context.user_data.get('current_game', 'football')
+        game_type = context.user_data.get('current_game', 'basketball')
         
         loading_text = f"⏳ {get_text(user_id, game_type)}\n\n"
         loading_text += f"{get_text(user_id, 'game_in_progress')}\n\n"
@@ -870,7 +858,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(deposit_text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
-    # 🔧 اصلاح: شرط برداشت بر اساس تعداد برد
     if data == "withdraw":
         if user_data['balance'] <= 0:
             error_text = f"⚠️ {get_text(user_id, 'insufficient_balance_title')}\n\n"
@@ -884,7 +871,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(error_text, reply_markup=get_back_only_keyboard(user_id))
             return
         
-        # 🔧 تغییر از games_played به total_wins
         if user_data['total_wins'] < MIN_WINS_FOR_WITHDRAWAL:
             remaining_wins = MIN_WINS_FOR_WITHDRAWAL - user_data['total_wins']
             
@@ -976,14 +962,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
         return
     
-    # 🔧 جدید: جستجوی کاربر
     if data == "admin_search_user" and user_id == ADMIN_ID:
         context.user_data['admin_action'] = 'search_user'
         admin_text = "🔍 جستجوی کاربر\n\n💬 ایدی کاربر را ارسال کنید:\n\n📝 مثال:\n123456789"
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
         return
     
-    # 🔧 جدید: نمایش جزئیات کاربر
     if data.startswith("admin_user_detail_") and user_id == ADMIN_ID:
         target_user_id = int(data.split("_")[3])
         
@@ -1127,7 +1111,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(admin_text, reply_markup=get_admin_keyboard())
         return
     
-    # 🔧 اصلاح: ریست کردن wins بعد از تایید برداشت
     if data.startswith("approve_withdrawal_") and user_id == ADMIN_ID:
         parts = data.split("_")
         target_user_id = int(parts[2])
@@ -1140,7 +1123,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await context.bot.send_message(chat_id=target_user_id, text=approval_text)
             
-            # 🔧 اصلاح: ریست کردن total_wins به 0
             if target_user_id in users_db:
                 users_db[target_user_id]['total_wins'] = 0
                 logger.info(f"✅ User {target_user_id} wins reset to 0 after withdrawal approval")
@@ -1189,7 +1171,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(error_text)
                 return
             
-            game_type = context.user_data.get('current_game', 'football')
+            game_type = context.user_data.get('current_game', 'basketball')
             context.user_data['waiting_for_custom_bet'] = False
             
             try:
@@ -1343,7 +1325,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == ADMIN_ID:
         admin_action = context.user_data.get('admin_action')
         
-        # 🔧 جدید: جستجوی کاربر
         if admin_action == 'search_user':
             try:
                 target_user_id = int(text.strip())
